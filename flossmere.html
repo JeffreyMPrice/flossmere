@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross Stitch Pattern Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 50%, #e3f2fd 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #4a148c;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #6a1b9a;
+            font-size: 1.1rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4a148c;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #7b1fa2;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #6a1b9a;
+        }
+
+        .btn-secondary {
+            background: #1976d2;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #1565c0;
+        }
+
+        .btn-success {
+            background: #388e3c;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #2e7d32;
+        }
+
+        .btn-gray {
+            background: #616161;
+            color: white;
+        }
+
+        .btn-gray:hover {
+            background: #424242;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            color: #424242;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 8px 0;
+        }
+
+        select, input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            color: #9e9e9e;
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 16px;
+        }
+
+        #cropCanvas {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+
+        #previewImage {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .pattern-info {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            color: #616161;
+        }
+
+        #patternGrid {
+            overflow: auto;
+            max-height: 500px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 8px;
+            background: white;
+        }
+
+        .stitch-grid {
+            display: inline-grid;
+            gap: 0;
+        }
+
+        .stitch-cell {
+            width: 12px;
+            height: 12px;
+            border: 1px solid #e0e0e0;
+            font-size: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .color-legend {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 6px;
+        }
+
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧵 Cross Stitch Pattern Generator</h1>
+            <p class="subtitle">Transform your photos into beautiful cross stitch patterns</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- Controls Column -->
+            <div class="controls-column">
+                <!-- Upload Panel -->
+                <div class="panel">
+                    <h2 class="panel-title">📤 Upload Image</h2>
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                        Choose Image
+                    </button>
+                </div>
+
+                <!-- Crop Panel -->
+                <div class="panel hidden" id="cropPanel">
+                    <h2 class="panel-title">✂️ Crop Image</h2>
+                    <button class="btn btn-secondary" id="adjustCropBtn" onclick="startCrop()">
+                        Adjust Crop
+                    </button>
+                    <div id="cropControls" class="hidden" style="margin-top: 12px;">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="maintainAspect">
+                                Maintain aspect ratio
+                            </label>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-success" onclick="applyCrop()">Apply</button>
+                            <button class="btn btn-gray" onclick="cancelCrop()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pattern Settings -->
+                <div class="panel hidden" id="settingsPanel">
+                    <h2 class="panel-title">⚙️ Pattern Settings</h2>
+
+                    <div class="form-group">
+                        <label for="fabricType">Fabric Type</label>
+                        <select id="fabricType">
+                            <option value="0">14 count Aida</option>
+                            <option value="1">16 count Aida</option>
+                            <option value="2">18 count Aida</option>
+                            <option value="3">22 count Aida</option>
+                            <option value="4">25 count Evenweave</option>
+                            <option value="5">28 count Evenweave</option>
+                            <option value="6">32 count Evenweave</option>
+                            <option value="7">28 count Linen</option>
+                            <option value="8">32 count Linen</option>
+                            <option value="9">36 count Linen</option>
+                            <option value="10">40 count Linen</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Number of Colors: <span id="colorCountValue">16</span></label>
+                        <input type="range" id="colorCount" min="2" max="32" value="16" oninput="document.getElementById('colorCountValue').textContent = this.value">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="algorithm">Color Algorithm</label>
+                        <select id="algorithm">
+                            <option value="sharp">Sharp Details - Best for detailed images</option>
+                            <option value="smooth">Smooth Gradients - Better for portraits</option>
+                            <option value="posterize">Posterize - Bold, graphic look</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary" id="generateBtn" onclick="generatePattern()">
+                        🎨 Generate Pattern
+                    </button>
+                </div>
+
+                <!-- Display Options -->
+                <div class="panel hidden" id="displayPanel">
+                    <h2 class="panel-title">👁️ Display Options</h2>
+
+                    <div class="form-group">
+                        <label for="displayMode">Display Mode</label>
+                        <select id="displayMode" onchange="updatePatternDisplay()">
+                            <option value="both">Colors + Symbols</option>
+                            <option value="colors">Colors Only</option>
+                            <option value="symbols">Symbols Only</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-success" onclick="exportToPDF()">
+                        💾 Export to PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preview Column -->
+            <div class="preview-column">
+                <div class="panel">
+                    <div id="emptyState" class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <p style="font-size: 1.2rem;">Upload an image to get started</p>
+                    </div>
+
+                    <div id="cropArea" class="hidden">
+                        <h3 class="panel-title">Crop Your Image</h3>
+                        <p style="margin-bottom: 12px; color: #666; font-size: 0.9rem;">Click and drag to select the area you want</p>
+                        <canvas id="cropCanvas"></canvas>
+                    </div>
+
+                    <div id="previewArea" class="hidden">
+                        <h3 class="panel-title">Preview</h3>
+                        <img id="previewImage" alt="Preview">
+                    </div>
+
+                    <div id="patternArea" class="hidden">
+                        <h3 class="panel-title">Pattern Preview</h3>
+                        <div class="pattern-info" id="patternInfo"></div>
+                        <div id="patternGrid"></div>
+
+                        <h3 class="panel-title" style="margin-top: 24px;">Color Legend</h3>
+                        <div class="color-legend" id="colorLegend"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DMC Color Palette
+        const DMC_COLORS = {"White":"#FFFFFF","Ecru":"#F0EAD6","150":"#AB3B5C","151":"#E8CCCF","152":"#C9859F","153":"#E3D3DC","154":"#6B2E45","155":"#9D7396","156":"#A9B4D7","157":"#BAC8E2","158":"#C5C8DC","159":"#C3CAD8","160":"#BBC7D7","161":"#B5BFD1","162":"#C0D2EA","163":"#526F74","164":"#B7D1AF","165":"#DFEF87","166":"#C5A15C","167":"#A3763B","168":"#BBBDC0","169":"#7D8084","208":"#7B3982","209":"#9B5D99","210":"#C6A5C9","211":"#DCC0DC","221":"#8B3A4E","223":"#B67476","224":"#E1A5A9","225":"#FFC9CE","300":"#B75F3D","301":"#B06334","304":"#B71234","307":"#FDD230","309":"#D4004B","310":"#000000","311":"#2C5F8D","312":"#254968","315":"#7D424A","316":"#CF737C","317":"#6C6C6C","318":"#939393","319":"#2A5D41","320":"#567B57","321":"#A31616","322":"#26547C","326":"#BB3655","327":"#5F2C52","333":"#6971A6","334":"#7FA6C3","335":"#D05E80","336":"#29476F","340":"#C08FBE","341":"#AEC8E2","347":"#A31C1C","349":"#A61317","350":"#C84543","351":"#CF5341","352":"#C95951","353":"#FAB5A0","355":"#934330","356":"#CA744D","367":"#3F6944","368":"#91B98C","369":"#C8DDB8","370":"#AD834A","371":"#AA743F","372":"#BA9462","400":"#A96234","402":"#C97744","407":"#B38871","413":"#3E3E3E","414":"#A2A2A2","415":"#D0D0D0","420":"#B77B50","422":"#C29865","433":"#7E4627","434":"#994E27","435":"#AF683A","436":"#BC824F","437":"#D6A574","444":"#FFD500","445":"#FFFAAD","451":"#939393","452":"#B8B8B8","453":"#D0CCC8","469":"#3A6238","470":"#507A3E","471":"#A2B78C","472":"#BBCE84","498":"#891519","500":"#144734","501":"#2F6051","502":"#5D8876","503":"#9BBF9D","504":"#C5D9CD","517":"#224454","518":"#32686F","519":"#89B3C0","520":"#2B513E","522":"#818C85","523":"#A6AAAD","524":"#C4C4C4","535":"#4D4D4D","543":"#D8C5BA","550":"#4E1954","552":"#6F2C74","553":"#915F99","554":"#D1ACD1","561":"#2F634A","562":"#3B7854","563":"#94C2A9","564":"#B8D7C6","580":"#6B8053","581":"#949855","597":"#5B939E","598":"#ADCED3","600":"#C94176","601":"#A53860","602":"#CC4F7A","603":"#E273A0","604":"#EFACC7","605":"#F5C7D8","606":"#DE2E18","608":"#E16817","610":"#826548","611":"#9E7F66","612":"#C2A88A","613":"#DBCBB3","632":"#764542","640":"#A49E9A","642":"#A89288","644":"#D4CCBE","645":"#A19A95","646":"#7A7A7A","647":"#B8B8B8","648":"#DCDCDC","666":"#BC0D28","676":"#E7C565","677":"#F0E1B9","680":"#A57C28","699":"#347933","700":"#228534","701":"#3D8C40","702":"#57A75C","703":"#7EB96D","704":"#99CD6D","712":"#F8F8F8","718":"#902A56","720":"#B94A1C","721":"#CC6633","722":"#DD8338","725":"#FBBB44","726":"#F7CA49","727":"#FFF5A1","729":"#D2A54A","730":"#856C37","731":"#8C7446","732":"#9A8153","733":"#B99E6C","734":"#A7A447","738":"#D2B888","739":"#E8D3A7","740":"#E06E11","741":"#F59500","742":"#FFB932","743":"#FDD559","744":"#FDE475","745":"#FFF2C5","746":"#FEFBF0","747":"#CEE7EF","754":"#F3C9C2","758":"#D89B88","760":"#EB8CAA","761":"#F7C7CF","762":"#DCDCDC","772":"#CFDB9F","775":"#C5DDEB","776":"#EFADB8","778":"#DBA6A1","780":"#9F5919","781":"#905B1F","782":"#C28B29","783":"#D69E31","791":"#32475D","792":"#5F78A0","793":"#8396BD","794":"#93B8DE","796":"#203864","797":"#203966","798":"#386193","799":"#81A4C8","800":"#C8DDF0","801":"#694226","803":"#2F5B8E","806":"#50A6BC","807":"#6EB3C0","809":"#94B4C9","813":"#ABC1D4","814":"#711E3D","815":"#7E151F","816":"#821A2C","817":"#AE1729","818":"#F4C9CD","819":"#F4D2D3","820":"#243E6C","822":"#E3D3C4","823":"#1C3F65","824":"#304A6D","825":"#2F5071","826":"#3D5F8C","827":"#89A7CC","828":"#B5CDE3","829":"#967047","830":"#826940","831":"#9D7742","832":"#C39B55","833":"#CC9F52","834":"#CDA748","838":"#3D2B1F","839":"#6B5747","840":"#9F8972","841":"#B6997A","842":"#C6A982","844":"#4D4D4D","869":"#7C4D35","890":"#184735","891":"#F95B6B","892":"#F6777A","893":"#F58D91","894":"#F6A1A5","895":"#21583C","898":"#633225","899":"#E95878","900":"#E4481C","902":"#852552","904":"#5D7F32","905":"#6C8E38","906":"#7FA848","907":"#8FB84D","909":"#356730","910":"#2C6035","911":"#236F3A","912":"#208C4F","913":"#74B98D","915":"#8C1940","917":"#771F41","918":"#883943","919":"#9D4B43","920":"#BC5333","921":"#C15D34","922":"#CD6736","924":"#436D76","926":"#6B9EA7","927":"#A2BCC3","928":"#C5D8DC","930":"#233D5B","931":"#3B5671","932":"#90A0B2","934":"#25442F","935":"#335239","936":"#456647","937":"#5A7B53","938":"#3C2415","939":"#1F2D47","943":"#479F92","945":"#F5D3BE","946":"#DC5032","947":"#E94E1B","948":"#FDE1D0","950":"#E3CEC3","951":"#F3E1CD","954":"#9EC375","955":"#96C49F","956":"#ED4C7F","957":"#F490A7","958":"#50A39F","959":"#79BDBA","961":"#E37396","962":"#ED86A8","963":"#F4C7CF","964":"#8FD3D1","966":"#99C68E","970":"#EF7518","971":"#EF8B21","972":"#FFB81C","973":"#FDD230","975":"#905B1F","976":"#D9995B","977":"#D7995B","986":"#336B49","987":"#3D7447","988":"#5B8D56","989":"#5C9A4F","991":"#366F53","992":"#58AFA2","993":"#7FCCC6","995":"#2E7B9B","996":"#4FA6D2","3011":"#776652","3012":"#998D70","3013":"#ABA47F","3021":"#5D4134","3022":"#9D9583","3023":"#A2998B","3024":"#BFBAB5","3031":"#533829","3032":"#B39F8F","3033":"#E4CDB5","3041":"#AB8FA1","3042":"#C4B2C1","3045":"#D4A773","3046":"#D7B887","3047":"#EEDCB5","3051":"#595941","3052":"#8E9371","3053":"#C5C1A6","3064":"#C57866","3072":"#CFD2D4","3078":"#FFF394","3325":"#A9C7E2","3326":"#FFA7B6","3328":"#C93255","3340":"#EF8B70","3341":"#EEA57C","3345":"#697E52","3346":"#628447","3347":"#7C9C5E","3348":"#C6D798","3350":"#C92952","3354":"#F5D2D9","3362":"#4D5F37","3363":"#788253","3364":"#7B8356","3371":"#2C211A","3607":"#D16093","3608":"#DA7BA4","3609":"#F2A7C5","3685":"#9E1B32","3687":"#CF516C","3688":"#E07A97","3689":"#F6B4C3","3705":"#F75569","3706":"#FE868D","3708":"#F8A0A9","3712":"#DC5454","3713":"#F5C9C6","3716":"#F7C7D5","3721":"#A53047","3722":"#AE5161","3726":"#A27584","3727":"#D2A1AE","3731":"#DE5675","3733":"#F198AE","3740":"#8A638C","3743":"#C2C2CC","3746":"#7A67AD","3747":"#D7E4ED","3750":"#1C4F5C","3752":"#C2D5DC","3753":"#E3F0F4","3755":"#8CA8D3","3756":"#E8F2FC","3760":"#69A5CA","3761":"#CCE2EF","3765":"#37899E","3766":"#80B5C7","3768":"#466F74","3770":"#FFEFC9","3771":"#CF7654","3772":"#9F5C3E","3773":"#D8A080","3774":"#F0D5CA","3776":"#BB6534","3777":"#982F1C","3778":"#CB6A52","3779":"#DD9177","3781":"#6E513C","3782":"#987C6E","3787":"#4B4847","3790":"#9E8070","3799":"#4A4A4A","3801":"#E87A94","3802":"#9D6D74","3803":"#A83E5A","3804":"#E63F7F","3805":"#EC4B89","3806":"#F37FA0","3807":"#5887A7","3808":"#6C999B","3809":"#6EB0C2","3810":"#5297A9","3811":"#B2E4E9","3812":"#2BA383","3813":"#B4D6C5","3814":"#3D8272","3815":"#4D7563","3816":"#51B47D","3817":"#8CC1AB","3818":"#275836","3819":"#F0BA4E","3820":"#EBAB30","3821":"#F8BC49","3822":"#F0D57C","3823":"#FFFCDD","3824":"#F99EA0","3825":"#FAB987","3826":"#A77543","3827":"#E3A968","3828":"#B87F46","3829":"#CA9858","3830":"#CB6449","3831":"#C44547","3832":"#E76F81","3833":"#E492A1","3834":"#8A3756","3835":"#98516B","3836":"#C4A4BC","3837":"#8E53A0","3838":"#5898B8","3839":"#7198C7","3840":"#92BED9","3841":"#C8DCE7","3842":"#2B5667","3843":"#0E90C4","3844":"#008BB2","3845":"#09B8C3","3846":"#0ECCD3","3847":"#218178","3848":"#366E67","3849":"#53A696","3850":"#2C8D82","3851":"#55B392","3852":"#D5A84A","3853":"#E4A14F","3854":"#E1974D","3855":"#FAC67E","3856":"#FDDBB3","3857":"#8D3D36","3858":"#9A4C43","3859":"#A25850","3860":"#9A7B6B","3861":"#AD9589","3862":"#936838","3863":"#836848","3864":"#B49F88","3865":"#F9F5F0","3866":"#F5F3F0"};
+
+        const FABRIC_TYPES = [
+            {name:'14 count Aida',spi:14},{name:'16 count Aida',spi:16},{name:'18 count Aida',spi:18},
+            {name:'22 count Aida',spi:22},{name:'25 count Evenweave',spi:12.5},{name:'28 count Evenweave',spi:14},
+            {name:'32 count Evenweave',spi:16},{name:'28 count Linen',spi:14},{name:'32 count Linen',spi:16},
+            {name:'36 count Linen',spi:18},{name:'40 count Linen',spi:20}
+        ];
+
+        const SYMBOLS = ['●','■','▲','◆','★','✦','▼','◀','▶','♦','○','□','△','☆','✧','▽','◁','▷','⬟','◈','◉','◘','◙','◐','◑','◒','◓','◔','◕','◖','◗','⬢'];
+
+        let currentImage = null;
+        let croppedImage = null;
+        let pattern = null;
+        let isCropping = false;
+        let cropStart = null;
+        let cropEnd = null;
+        let canvas, ctx;
+
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        currentImage = img;
+                        croppedImage = null;
+                        pattern = null;
+
+                        document.getElementById('emptyState').classList.add('hidden');
+                        document.getElementById('cropPanel').classList.remove('hidden');
+                        document.getElementById('settingsPanel').classList.remove('hidden');
+                        document.getElementById('displayPanel').classList.add('hidden');
+                        document.getElementById('patternArea').classList.add('hidden');
+
+                        startCrop();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function startCrop() {
+            isCropping = true;
+            cropStart = null;
+            cropEnd = null;
+
+            document.getElementById('cropArea').classList.remove('hidden');
+            document.getElementById('previewArea').classList.add('hidden');
+            document.getElementById('patternArea').classList.add('hidden');
+            document.getElementById('cropControls').classList.remove('hidden');
+            document.getElementById('adjustCropBtn').classList.add('hidden');
+
+            canvas = document.getElementById('cropCanvas');
+            ctx = canvas.getContext('2d');
+
+            const maxWidth = 800;
+            const maxHeight = 600;
+            let width = currentImage.width;
+            let height = currentImage.height;
+
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width *= ratio;
+                height *= ratio;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(currentImage, 0, 0, width, height);
+        }
+
+        canvas = document.getElementById('cropCanvas');
+        canvas.addEventListener('mousedown', function(e) {
+            if (!isCropping) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            cropStart = {x, y};
+            cropEnd = {x, y};
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (!isCropping || !cropStart) return;
+            const rect = canvas.getBoundingClientRect();
+            let x = (e.clientX - rect.left) / rect.width;
+            let y = (e.clientY - rect.top) / rect.height;
+
+            if (document.getElementById('maintainAspect').checked && currentImage) {
+                const aspectRatio = currentImage.width / currentImage.height;
+                const width = Math.abs(x - cropStart.x);
+                const height = width / aspectRatio;
+                y = cropStart.y + (y > cropStart.y ? height : -height);
+            }
+
+            cropEnd = {x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y))};
+            drawCropOverlay();
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            if (cropStart && cropEnd) {
+                drawCropOverlay();
+            }
+        });
+
+        function drawCropOverlay() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+
+            if (cropStart && cropEnd) {
+                const x1 = Math.min(cropStart.x, cropEnd.x) * canvas.width;
+                const y1 = Math.min(cropStart.y, cropEnd.y) * canvas.height;
+                const x2 = Math.max(cropStart.x, cropEnd.x) * canvas.width;
+                const y2 = Math.max(cropStart.y, cropEnd.y) * canvas.height;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, y1);
+                ctx.fillRect(0, y2, canvas.width, canvas.height - y2);
+                ctx.fillRect(0, y1, x1, y2 - y1);
+                ctx.fillRect(x2, y1, canvas.width - x2, y2 - y1);
+
+                ctx.strokeStyle = '#7b1fa2';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+            }
+        }
+
+        function applyCrop() {
+            if (!currentImage || !cropStart || !cropEnd) return;
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const x1 = Math.min(cropStart.x, cropEnd.x) * currentImage.width;
+            const y1 = Math.min(cropStart.y, cropEnd.y) * currentImage.height;
+            const x2 = Math.max(cropStart.x, cropEnd.x) * currentImage.width;
+            const y2 = Math.max(cropStart.y, cropEnd.y) * currentImage.height;
+            const width = x2 - x1;
+            const height = y2 - y1;
+
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            tempCtx.drawImage(currentImage, x1, y1, width, height, 0, 0, width, height);
+
+            const img = new Image();
+            img.onload = function() {
+                croppedImage = img;
+                cancelCrop();
+                showPreview();
+            };
+            img.src = tempCanvas.toDataURL();
+        }
+
+        function cancelCrop() {
+            isCropping = false;
+            cropStart = null;
+            cropEnd = null;
+            document.getElementById('cropArea').classList.add('hidden');
+            document.getElementById('cropControls').classList.add('hidden');
+            document.getElementById('adjustCropBtn').classList.remove('hidden');
+        }
+
+        function showPreview() {
+            const img = croppedImage || currentImage;
+            document.getElementById('previewImage').src = img.src;
+            document.getElementById('previewArea').classList.remove('hidden');
+        }
+
+        // Color conversion functions
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function rgbToLab(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+            g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+            b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+            let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+            let y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+            let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+
+            x = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+            y = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+            z = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+
+            return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
+        }
+
+        function colorDistance(lab1, lab2) {
+            const dL = lab1[0] - lab2[0];
+            const da = lab1[1] - lab2[1];
+            const db = lab1[2] - lab2[2];
+            return Math.sqrt(dL * dL + da * da + db * db);
+        }
+
+        function findClosestDMC(r, g, b, excludeSet = new Set()) {
+            const targetLab = rgbToLab(r, g, b);
+            let closest = null;
+            let minDistance = Infinity;
+
+            for (const [code, hex] of Object.entries(DMC_COLORS)) {
+                if (excludeSet.has(code)) continue;
+                const rgb = hexToRgb(hex);
+                const lab = rgbToLab(rgb.r, rgb.g, rgb.b);
+                const distance = colorDistance(targetLab, lab);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closest = {code, hex};
+                }
+            }
+
+            return closest;
+        }
+
+        function generatePattern() {
+            const sourceImage = croppedImage || currentImage;
+            if (!sourceImage) return;
+
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('generateBtn').textContent = 'Generating...';
+
+            setTimeout(() => {
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+
+                const aspectRatio = sourceImage.width / sourceImage.height;
+                let stitchWidth, stitchHeight;
+
+                if (aspectRatio > 1) {
+                    stitchWidth = 100;
+                    stitchHeight = Math.round(100 / aspectRatio);
+                } else {
+                    stitchHeight = 100;
+                    stitchWidth = Math.round(100 * aspectRatio);
+                }
+
+                tempCanvas.width = stitchWidth;
+                tempCanvas.height = stitchHeight;
+
+                const algorithm = document.getElementById('algorithm').value;
+                if (algorithm === 'smooth') {
+                    tempCtx.imageSmoothingEnabled = true;
+                    tempCtx.imageSmoothingQuality = 'high';
+                } else {
+                    tempCtx.imageSmoothingEnabled = false;
+                }
+
+                tempCtx.drawImage(sourceImage, 0, 0, stitchWidth, stitchHeight);
+                const imageData = tempCtx.getImageData(0, 0, stitchWidth, stitchHeight);
+
+                // Quantize colors (skip transparent pixels)
+                const colorCount = parseInt(document.getElementById('colorCount').value);
+                const colorMap = {};
+                let transparentCount = 0;
+
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                    const a = imageData.data[i + 3];
+                    if (a < 128) {
+                        transparentCount++;
+                        continue; // Skip transparent pixels
+                    }
+                    const r = imageData.data[i];
+                    const g = imageData.data[i + 1];
+                    const b = imageData.data[i + 2];
+                    const key = `${r},${g},${b}`;
+                    colorMap[key] = (colorMap[key] || 0) + 1;
+                }
+
+                const sortedColors = Object.entries(colorMap)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, colorCount * 2)
+                    .map(([key]) => {
+                        const [r, g, b] = key.split(',').map(Number);
+                        return {r, g, b};
+                    });
+
+                const palette = sortedColors.slice(0, colorCount);
+                const usedDMC = new Set();
+                const dmcPalette = {};
+
+                palette.forEach(color => {
+                    const dmc = findClosestDMC(color.r, color.g, color.b, usedDMC);
+                    if (dmc) {
+                        usedDMC.add(dmc.code);
+                        dmcPalette[`${color.r},${color.g},${color.b}`] = dmc;
+                    }
+                });
+
+                // Create grid
+                const grid = [];
+                const colorUsage = {};
+
+                for (let y = 0; y < stitchHeight; y++) {
+                    const row = [];
+                    for (let x = 0; x < stitchWidth; x++) {
+                        const i = (y * stitchWidth + x) * 4;
+                        const a = imageData.data[i + 3];
+
+                        // Skip transparent pixels
+                        if (a < 128) {
+                            row.push(null);
+                            continue;
+                        }
+
+                        const r = imageData.data[i];
+                        const g = imageData.data[i + 1];
+                        const b = imageData.data[i + 2];
+
+                        let closestColor = palette[0];
+                        let minDist = Infinity;
+
+                        palette.forEach(pColor => {
+                            const dist = Math.sqrt(
+                                Math.pow(r - pColor.r, 2) +
+                                Math.pow(g - pColor.g, 2) +
+                                Math.pow(b - pColor.b, 2)
+                            );
+                            if (dist < minDist) {
+                                minDist = dist;
+                                closestColor = pColor;
+                            }
+                        });
+
+                        const key = `${closestColor.r},${closestColor.g},${closestColor.b}`;
+                        const dmc = dmcPalette[key];
+
+                        if (dmc) {
+                            row.push(dmc);
+                            colorUsage[dmc.code] = (colorUsage[dmc.code] || 0) + 1;
+                        } else {
+                            row.push(null);
+                        }
+                    }
+                    grid.push(row);
+                }
+
+                const sortedDMCColors = Object.entries(colorUsage)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([code], idx) => ({
+                        code,
+                        hex: DMC_COLORS[code],
+                        symbol: SYMBOLS[idx % SYMBOLS.length],
+                        count: colorUsage[code]
+                    }));
+
+                // Check if dominant color should be fabric instead
+                const totalStitches = stitchWidth * stitchHeight - transparentCount;
+                let fabricColor = null;
+
+                if (sortedDMCColors.length > 0) {
+                    const dominantColor = sortedDMCColors[0];
+                    const dominantPercentage = (dominantColor.count / totalStitches) * 100;
+
+                    // If dominant color is more than 40% and more than 500 stitches, suggest as fabric
+                    if (dominantPercentage > 40 && dominantColor.count > 500) {
+                        fabricColor = {
+                            code: dominantColor.code,
+                            name: `DMC ${dominantColor.code}`,
+                            hex: dominantColor.hex,
+                            saved: dominantColor.count
+                        };
+
+                        // Remove this color from the pattern
+                        for (let y = 0; y < grid.length; y++) {
+                            for (let x = 0; x < grid[y].length; x++) {
+                                if (grid[y][x] && grid[y][x].code === dominantColor.code) {
+                                    grid[y][x] = null;
+                                }
+                            }
+                        }
+
+                        // Remove from color list
+                        sortedDMCColors.shift();
+
+                        // Reassign symbols
+                        sortedDMCColors.forEach((color, idx) => {
+                            color.symbol = SYMBOLS[idx % SYMBOLS.length];
+                        });
+                    }
+                }
+
+                pattern = {
+                    grid,
+                    colors: sortedDMCColors,
+                    width: stitchWidth,
+                    height: stitchHeight,
+                    fabricColor
+                };
+
+                displayPattern();
+
+                document.getElementById('generateBtn').disabled = false;
+                document.getElementById('generateBtn').textContent = '🎨 Generate Pattern';
+                document.getElementById('displayPanel').classList.remove('hidden');
+            }, 100);
+        }
+
+        function displayPattern() {
+            if (!pattern) return;
+
+            const fabricIdx = parseInt(document.getElementById('fabricType').value);
+            const fabric = FABRIC_TYPES[fabricIdx];
+
+            const widthIn = (pattern.width / fabric.spi).toFixed(1);
+            const heightIn = (pattern.height / fabric.spi).toFixed(1);
+
+            let fabricSuggestion = '';
+            if (pattern.fabricColor) {
+                fabricSuggestion = `<br><strong>💡 Suggestion:</strong> Use ${pattern.fabricColor.name} fabric instead of stitching DMC ${pattern.fabricColor.code} (saves ${pattern.fabricColor.saved} stitches)`;
+            }
+
+            document.getElementById('patternInfo').innerHTML = `
+                <strong>${pattern.width} × ${pattern.height} stitches</strong><br>
+                Finished size: ${widthIn} × ${heightIn} inches on ${fabric.name}<br>
+                Colors: ${pattern.colors.length}${fabricSuggestion}
+            `;
+
+            updatePatternDisplay();
+
+            const legendHtml = pattern.colors.map(color => `
+                <div class="color-item">
+                    <div class="color-swatch" style="background-color: ${color.hex}">
+                        ${color.symbol}
+                    </div>
+                    <span style="font-size: 0.9rem; font-weight: 500;">DMC ${color.code}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('colorLegend').innerHTML = legendHtml;
+            document.getElementById('patternArea').classList.remove('hidden');
+            document.getElementById('previewArea').classList.add('hidden');
+        }
+
+        function updatePatternDisplay() {
+            if (!pattern) return;
+
+            const mode = document.getElementById('displayMode').value;
+            const gridHtml = document.createElement('div');
+            gridHtml.className = 'stitch-grid';
+            gridHtml.style.gridTemplateColumns = `repeat(${pattern.width}, 12px)`;
+
+            pattern.grid.forEach(row => {
+                row.forEach(stitch => {
+                    if (!stitch) {
+                        // Empty cell for transparent/fabric color
+                        const cell = document.createElement('div');
+                        cell.className = 'stitch-cell';
+                        cell.style.backgroundColor = pattern.fabricColor ? pattern.fabricColor.hex : '#f5f5f5';
+                        gridHtml.appendChild(cell);
+                        return;
+                    }
+
+                    const color = pattern.colors.find(c => c.code === stitch.code);
+                    const cell = document.createElement('div');
+                    cell.className = 'stitch-cell';
+
+                    if (mode === 'colors' || mode === 'both') {
+                        cell.style.backgroundColor = color.hex;
+                    } else {
+                        cell.style.backgroundColor = 'white';
+                    }
+
+                    if (mode === 'symbols' || mode === 'both') {
+                        cell.textContent = color.symbol;
+                        if (mode === 'both') {
+                            cell.style.color = 'white';
+                            cell.style.textShadow = '0 0 2px black';
+                        } else {
+                            cell.style.color = 'black';
+                        }
+                    }
+
+                    gridHtml.appendChild(cell);
+                });
+            });
+
+            document.getElementById('patternGrid').innerHTML = '';
+            document.getElementById('patternGrid').appendChild(gridHtml);
+        }
+
+        function exportToPDF() {
+            if (!pattern) return;
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = 210;
+            const pageHeight = 297;
+            const margin = 10;
+
+            // Page 1: Title and preview
+            pdf.setFontSize(18);
+            pdf.text('Cross Stitch Pattern', pageWidth / 2, 15, {align: 'center'});
+
+            const sourceImage = croppedImage || currentImage;
+            if (sourceImage) {
+                const imgCanvas = document.createElement('canvas');
+                const imgCtx = imgCanvas.getContext('2d');
+                const maxPreviewSize = 80;
+                const aspectRatio = sourceImage.width / sourceImage.height;
+
+                let previewWidth, previewHeight;
+                if (aspectRatio > 1) {
+                    previewWidth = maxPreviewSize;
+                    previewHeight = maxPreviewSize / aspectRatio;
+                } else {
+                    previewHeight = maxPreviewSize;
+                    previewWidth = maxPreviewSize * aspectRatio;
+                }
+
+                imgCanvas.width = previewWidth * 2;
+                imgCanvas.height = previewHeight * 2;
+                imgCtx.drawImage(sourceImage, 0, 0, imgCanvas.width, imgCanvas.height);
+
+                const imgData = imgCanvas.toDataURL('image/jpeg');
+                const xPos = (pageWidth - previewWidth) / 2;
+                pdf.addImage(imgData, 'JPEG', xPos, 25, previewWidth, previewHeight);
+            }
+
+            const fabricIdx = parseInt(document.getElementById('fabricType').value);
+            const fabric = FABRIC_TYPES[fabricIdx];
+            const widthIn = (pattern.width / fabric.spi).toFixed(1);
+            const heightIn = (pattern.height / fabric.spi).toFixed(1);
+
+            const infoY = 115;
+            pdf.setFontSize(12);
+            pdf.text(`Pattern Size: ${pattern.width} x ${pattern.height} stitches`, margin, infoY);
+            pdf.text(`Fabric: ${fabric.name}`, margin, infoY + 7);
+            pdf.text(`Finished Size: ${widthIn} x ${heightIn} inches`, margin, infoY + 14);
+            pdf.text(`Number of Colors: ${pattern.colors.length}`, margin, infoY + 21);
+
+            if (pattern.fabricColor) {
+                pdf.setFontSize(11);
+                pdf.setTextColor(139, 0, 0);
+                pdf.text(`Suggestion: Use ${pattern.fabricColor.name} colored fabric`, margin, infoY + 28);
+                pdf.text(`(Saves ${pattern.fabricColor.saved} stitches)`, margin, infoY + 35);
+                pdf.setTextColor(0, 0, 0);
+            }
+
+            // Page 2: Color Legend
+            pdf.addPage();
+            pdf.setFontSize(16);
+            pdf.text('Color Legend', pageWidth / 2, 15, {align: 'center'});
+
+            if (pattern.fabricColor) {
+                pdf.setFontSize(11);
+                pdf.setTextColor(139, 0, 0);
+                pdf.text(`Recommended Fabric: ${pattern.fabricColor.name}`, pageWidth / 2, 22, {align: 'center'});
+                pdf.setTextColor(0, 0, 0);
+            }
+
+            pdf.setFontSize(10);
+            let legendY = pattern.fabricColor ? 32 : 25;
+            const colWidth = 90;
+            let col = 0;
+
+            pattern.colors.forEach((color) => {
+                const x = margin + (col * colWidth);
+
+                const rgb = hexToRgb(color.hex);
+                pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+                pdf.rect(x, legendY - 3, 5, 5, 'F');
+
+                pdf.setTextColor(0, 0, 0);
+                pdf.text(`${color.symbol}  DMC ${color.code}`, x + 7, legendY);
+
+                legendY += 7;
+                if (legendY > pageHeight - 20) {
+                    legendY = 25;
+                    col++;
+                    if (col >= 2) {
+                        pdf.addPage();
+                        pdf.setFontSize(16);
+                        pdf.text('Color Legend (continued)', pageWidth / 2, 15, {align: 'center'});
+                        pdf.setFontSize(10);
+                        legendY = 25;
+                        col = 0;
+                    }
+                }
+            });
+
+            // Pattern Grid Pages
+            const cellSize = 3;
+            const stitchesPerPage = Math.floor((pageWidth - 2 * margin) / cellSize);
+            const stitchesPerPageHeight = Math.floor((pageHeight - 30) / cellSize);
+
+            const pagesWide = Math.ceil(pattern.width / stitchesPerPage);
+            const pagesTall = Math.ceil(pattern.height / stitchesPerPageHeight);
+            const displayMode = document.getElementById('displayMode').value;
+
+            for (let pageY = 0; pageY < pagesTall; pageY++) {
+                for (let pageX = 0; pageX < pagesWide; pageX++) {
+                    pdf.addPage();
+
+                    pdf.setFontSize(12);
+                    const pageTitle = `Pattern Grid - Page ${pageY * pagesWide + pageX + 1} of ${pagesWide * pagesTall}`;
+                    pdf.text(pageTitle, pageWidth / 2, 15, {align: 'center'});
+
+                    const startX = pageX * stitchesPerPage;
+                    const startY = pageY * stitchesPerPageHeight;
+                    const endX = Math.min(startX + stitchesPerPage, pattern.width);
+                    const endY = Math.min(startY + stitchesPerPageHeight, pattern.height);
+
+                    pdf.setFontSize(6);
+                    pdf.setTextColor(150, 150, 150);
+
+                    // Column numbers
+                    for (let x = startX; x < endX; x++) {
+                        if ((x + 1) % 10 === 0) {
+                            const px = margin + (x - startX) * cellSize + cellSize / 2;
+                            pdf.text(String(x + 1), px, 22, {align: 'center'});
+                        }
+                    }
+
+                    // Draw grid
+                    for (let y = startY; y < endY; y++) {
+                        const py = 25 + (y - startY) * cellSize;
+
+                        if ((y + 1) % 10 === 0) {
+                            pdf.text(String(y + 1), margin - 2, py + cellSize / 2, {align: 'right'});
+                        }
+
+                        for (let x = startX; x < endX; x++) {
+                            const px = margin + (x - startX) * cellSize;
+                            const stitch = pattern.grid[y][x];
+
+                            // Draw fabric color background for null stitches
+                            if (!stitch) {
+                                if (pattern.fabricColor) {
+                                    const rgb = hexToRgb(pattern.fabricColor.hex);
+                                    pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+                                    pdf.rect(px, py, cellSize, cellSize, 'F');
+                                }
+                            } else {
+                                const color = pattern.colors.find(c => c.code === stitch.code);
+
+                                if (displayMode === 'colors' || displayMode === 'both') {
+                                    const rgb = hexToRgb(color.hex);
+                                    pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+                                    pdf.rect(px, py, cellSize, cellSize, 'F');
+                                }
+
+                                if (displayMode === 'symbols' || displayMode === 'both') {
+                                    pdf.setTextColor(displayMode === 'both' ? 255 : 0);
+                                    pdf.setFontSize(cellSize * 2);
+                                    pdf.text(color.symbol, px + cellSize / 2, py + cellSize * 0.7, {align: 'center'});
+                                }
+                            }
+
+                            // Grid lines
+                            pdf.setDrawColor(200, 200, 200);
+                            pdf.setLineWidth(0.1);
+                            pdf.rect(px, py, cellSize, cellSize);
+
+                            // Bold grid every 10
+                            if ((x + 1) % 10 === 0 || (y + 1) % 10 === 0) {
+                                pdf.setDrawColor(100, 100, 100);
+                                pdf.setLineWidth(0.3);
+                                if ((x + 1) % 10 === 0) {
+                                    pdf.line(px + cellSize, py, px + cellSize, py + cellSize);
+                                }
+                                if ((y + 1) % 10 === 0) {
+                                    pdf.line(px, py + cellSize, px + cellSize, py + cellSize);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            pdf.save('cross-stitch-pattern.pdf');
+        }
+    </script>
+</body>
+</html>

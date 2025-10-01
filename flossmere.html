@@ -309,7 +309,7 @@
 
                     <div class="form-group">
                         <label for="fabricType">Fabric Type</label>
-                        <select id="fabricType">
+                        <select id="fabricType" onchange="updatePatternSize()">
                             <option value="0">14 count Aida</option>
                             <option value="1">16 count Aida</option>
                             <option value="2">18 count Aida</option>
@@ -322,6 +322,15 @@
                             <option value="9">36 count Linen</option>
                             <option value="10">40 count Linen</option>
                         </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="patternSize">Pattern Width (inches)</label>
+                        <input type="number" id="patternSize" min="1" max="50" step="0.5" value="7"
+                               oninput="updatePatternSize()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                        <div style="margin-top: 8px; font-size: 0.85rem; color: #666;" id="patternDimensions">
+                            Height will be calculated based on image aspect ratio
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -567,6 +576,26 @@
             const img = croppedImage || currentImage;
             document.getElementById('previewImage').src = img.src;
             document.getElementById('previewArea').classList.remove('hidden');
+            updatePatternSize();
+        }
+
+        function updatePatternSize() {
+            const img = croppedImage || currentImage;
+            if (!img) return;
+
+            const fabricIdx = parseInt(document.getElementById('fabricType').value);
+            const fabric = FABRIC_TYPES[fabricIdx];
+            const widthInches = parseFloat(document.getElementById('patternSize').value) || 7;
+
+            const aspectRatio = img.width / img.height;
+            const heightInches = widthInches / aspectRatio;
+
+            const stitchWidth = Math.round(widthInches * fabric.spi);
+            const stitchHeight = Math.round(heightInches * fabric.spi);
+
+            document.getElementById('patternDimensions').innerHTML = `
+                ${widthInches}" × ${heightInches.toFixed(1)}" = ${stitchWidth} × ${stitchHeight} stitches
+            `;
         }
 
         // Color conversion functions
@@ -634,16 +663,16 @@
                 const tempCanvas = document.createElement('canvas');
                 const tempCtx = tempCanvas.getContext('2d');
 
-                const aspectRatio = sourceImage.width / sourceImage.height;
-                let stitchWidth, stitchHeight;
+                // Calculate pattern size based on user input
+                const fabricIdx = parseInt(document.getElementById('fabricType').value);
+                const fabric = FABRIC_TYPES[fabricIdx];
+                const widthInches = parseFloat(document.getElementById('patternSize').value) || 7;
 
-                if (aspectRatio > 1) {
-                    stitchWidth = 100;
-                    stitchHeight = Math.round(100 / aspectRatio);
-                } else {
-                    stitchHeight = 100;
-                    stitchWidth = Math.round(100 * aspectRatio);
-                }
+                const aspectRatio = sourceImage.width / sourceImage.height;
+                const heightInches = widthInches / aspectRatio;
+
+                const stitchWidth = Math.round(widthInches * fabric.spi);
+                const stitchHeight = Math.round(heightInches * fabric.spi);
 
                 tempCanvas.width = stitchWidth;
                 tempCanvas.height = stitchHeight;
@@ -689,6 +718,7 @@
                 const usedDMC = new Set();
                 const dmcPalette = {};
 
+                // First pass: find closest DMC colors
                 palette.forEach(color => {
                     const dmc = findClosestDMC(color.r, color.g, color.b, usedDMC);
                     if (dmc) {
@@ -696,6 +726,14 @@
                         dmcPalette[`${color.r},${color.g},${color.b}`] = dmc;
                     }
                 });
+
+                // Second pass: map all pixels to their closest DMC color
+                // This ensures colors in pattern match actual DMC colors
+                const dmcColorList = Array.from(usedDMC).map(code => ({
+                    code,
+                    hex: DMC_COLORS[code],
+                    ...hexToRgb(DMC_COLORS[code])
+                }));
 
                 // Create grid
                 const grid = [];
@@ -707,7 +745,7 @@
                         const i = (y * stitchWidth + x) * 4;
                         const a = imageData.data[i + 3];
 
-                        // Skip transparent pixels
+                        // Skip transparent pixels - no stitch needed
                         if (a < 128) {
                             row.push(null);
                             continue;
@@ -717,30 +755,24 @@
                         const g = imageData.data[i + 1];
                         const b = imageData.data[i + 2];
 
-                        let closestColor = palette[0];
+                        // Find closest DMC color directly
+                        let closestDMC = dmcColorList[0];
                         let minDist = Infinity;
 
-                        palette.forEach(pColor => {
+                        dmcColorList.forEach(dmcColor => {
                             const dist = Math.sqrt(
-                                Math.pow(r - pColor.r, 2) +
-                                Math.pow(g - pColor.g, 2) +
-                                Math.pow(b - pColor.b, 2)
+                                Math.pow(r - dmcColor.r, 2) +
+                                Math.pow(g - dmcColor.g, 2) +
+                                Math.pow(b - dmcColor.b, 2)
                             );
                             if (dist < minDist) {
                                 minDist = dist;
-                                closestColor = pColor;
+                                closestDMC = dmcColor;
                             }
                         });
 
-                        const key = `${closestColor.r},${closestColor.g},${closestColor.b}`;
-                        const dmc = dmcPalette[key];
-
-                        if (dmc) {
-                            row.push(dmc);
-                            colorUsage[dmc.code] = (colorUsage[dmc.code] || 0) + 1;
-                        } else {
-                            row.push(null);
-                        }
+                        row.push({code: closestDMC.code, hex: closestDMC.hex});
+                        colorUsage[closestDMC.code] = (colorUsage[closestDMC.code] || 0) + 1;
                     }
                     grid.push(row);
                 }
@@ -853,10 +885,11 @@
             pattern.grid.forEach(row => {
                 row.forEach(stitch => {
                     if (!stitch) {
-                        // Empty cell for transparent/fabric color
+                        // Empty cell for transparent/no stitch - shows fabric color
                         const cell = document.createElement('div');
                         cell.className = 'stitch-cell';
-                        cell.style.backgroundColor = pattern.fabricColor ? pattern.fabricColor.hex : '#f5f5f5';
+                        cell.style.backgroundColor = pattern.fabricColor ? pattern.fabricColor.hex : '#ffffff';
+                        cell.style.border = '1px solid #e0e0e0';
                         gridHtml.appendChild(cell);
                         return;
                     }
@@ -989,89 +1022,95 @@
                 }
             });
 
-            // Pattern Grid Pages
-            const cellSize = 3;
-            const stitchesPerPage = Math.floor((pageWidth - 2 * margin) / cellSize);
-            const stitchesPerPageHeight = Math.floor((pageHeight - 30) / cellSize);
+            // Pattern Grid Pages - Scale to fit on one page
+            const cellSize = Math.min(
+                (pageWidth - 2 * margin) / pattern.width,
+                (pageHeight - 40) / pattern.height,
+                4 // Maximum cell size for readability
+            );
 
-            const pagesWide = Math.ceil(pattern.width / stitchesPerPage);
-            const pagesTall = Math.ceil(pattern.height / stitchesPerPageHeight);
+            pdf.addPage();
+            pdf.setFontSize(14);
+            pdf.text('Pattern Grid', pageWidth / 2, 15, {align: 'center'});
+
+            // Center the pattern on the page
+            const gridWidth = pattern.width * cellSize;
+            const gridHeight = pattern.height * cellSize;
+            const startX = (pageWidth - gridWidth) / 2;
+            const startY = 30;
+
             const displayMode = document.getElementById('displayMode').value;
 
-            for (let pageY = 0; pageY < pagesTall; pageY++) {
-                for (let pageX = 0; pageX < pagesWide; pageX++) {
-                    pdf.addPage();
+            // Draw row/column numbers if cells are large enough
+            if (cellSize >= 2) {
+                pdf.setFontSize(Math.max(5, cellSize * 1.5));
+                pdf.setTextColor(150, 150, 150);
 
-                    pdf.setFontSize(12);
-                    const pageTitle = `Pattern Grid - Page ${pageY * pagesWide + pageX + 1} of ${pagesWide * pagesTall}`;
-                    pdf.text(pageTitle, pageWidth / 2, 15, {align: 'center'});
+                // Column numbers
+                for (let x = 0; x < pattern.width; x++) {
+                    if ((x + 1) % 10 === 0) {
+                        const px = startX + x * cellSize + cellSize / 2;
+                        pdf.text(String(x + 1), px, startY - 3, {align: 'center'});
+                    }
+                }
 
-                    const startX = pageX * stitchesPerPage;
-                    const startY = pageY * stitchesPerPageHeight;
-                    const endX = Math.min(startX + stitchesPerPage, pattern.width);
-                    const endY = Math.min(startY + stitchesPerPageHeight, pattern.height);
+                // Row numbers
+                for (let y = 0; y < pattern.height; y++) {
+                    if ((y + 1) % 10 === 0) {
+                        const py = startY + y * cellSize + cellSize / 2;
+                        pdf.text(String(y + 1), startX - 3, py, {align: 'right'});
+                    }
+                }
+            }
 
-                    pdf.setFontSize(6);
-                    pdf.setTextColor(150, 150, 150);
+            // Draw grid
+            for (let y = 0; y < pattern.height; y++) {
+                const py = startY + y * cellSize;
 
-                    // Column numbers
-                    for (let x = startX; x < endX; x++) {
-                        if ((x + 1) % 10 === 0) {
-                            const px = margin + (x - startX) * cellSize + cellSize / 2;
-                            pdf.text(String(x + 1), px, 22, {align: 'center'});
+                for (let x = 0; x < pattern.width; x++) {
+                    const px = startX + x * cellSize;
+                    const stitch = pattern.grid[y][x];
+
+                    // Draw fabric color background for null stitches
+                    if (!stitch) {
+                        if (pattern.fabricColor) {
+                            const rgb = hexToRgb(pattern.fabricColor.hex);
+                            pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+                        } else {
+                            pdf.setFillColor(255, 255, 255);
+                        }
+                        pdf.rect(px, py, cellSize, cellSize, 'F');
+                    } else {
+                        const color = pattern.colors.find(c => c.code === stitch.code);
+
+                        if (displayMode === 'colors' || displayMode === 'both') {
+                            const rgb = hexToRgb(color.hex);
+                            pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+                            pdf.rect(px, py, cellSize, cellSize, 'F');
+                        }
+
+                        if ((displayMode === 'symbols' || displayMode === 'both') && cellSize >= 1.5) {
+                            pdf.setTextColor(displayMode === 'both' ? 255 : 0);
+                            pdf.setFontSize(Math.min(cellSize * 2, 8));
+                            pdf.text(color.symbol, px + cellSize / 2, py + cellSize * 0.7, {align: 'center'});
                         }
                     }
 
-                    // Draw grid
-                    for (let y = startY; y < endY; y++) {
-                        const py = 25 + (y - startY) * cellSize;
+                    // Grid lines
+                    if (cellSize >= 1) {
+                        pdf.setDrawColor(200, 200, 200);
+                        pdf.setLineWidth(0.1);
+                        pdf.rect(px, py, cellSize, cellSize);
 
-                        if ((y + 1) % 10 === 0) {
-                            pdf.text(String(y + 1), margin - 2, py + cellSize / 2, {align: 'right'});
-                        }
-
-                        for (let x = startX; x < endX; x++) {
-                            const px = margin + (x - startX) * cellSize;
-                            const stitch = pattern.grid[y][x];
-
-                            // Draw fabric color background for null stitches
-                            if (!stitch) {
-                                if (pattern.fabricColor) {
-                                    const rgb = hexToRgb(pattern.fabricColor.hex);
-                                    pdf.setFillColor(rgb.r, rgb.g, rgb.b);
-                                    pdf.rect(px, py, cellSize, cellSize, 'F');
-                                }
-                            } else {
-                                const color = pattern.colors.find(c => c.code === stitch.code);
-
-                                if (displayMode === 'colors' || displayMode === 'both') {
-                                    const rgb = hexToRgb(color.hex);
-                                    pdf.setFillColor(rgb.r, rgb.g, rgb.b);
-                                    pdf.rect(px, py, cellSize, cellSize, 'F');
-                                }
-
-                                if (displayMode === 'symbols' || displayMode === 'both') {
-                                    pdf.setTextColor(displayMode === 'both' ? 255 : 0);
-                                    pdf.setFontSize(cellSize * 2);
-                                    pdf.text(color.symbol, px + cellSize / 2, py + cellSize * 0.7, {align: 'center'});
-                                }
+                        // Bold grid every 10
+                        if (cellSize >= 2 && ((x + 1) % 10 === 0 || (y + 1) % 10 === 0)) {
+                            pdf.setDrawColor(100, 100, 100);
+                            pdf.setLineWidth(0.3);
+                            if ((x + 1) % 10 === 0) {
+                                pdf.line(px + cellSize, py, px + cellSize, py + cellSize);
                             }
-
-                            // Grid lines
-                            pdf.setDrawColor(200, 200, 200);
-                            pdf.setLineWidth(0.1);
-                            pdf.rect(px, py, cellSize, cellSize);
-
-                            // Bold grid every 10
-                            if ((x + 1) % 10 === 0 || (y + 1) % 10 === 0) {
-                                pdf.setDrawColor(100, 100, 100);
-                                pdf.setLineWidth(0.3);
-                                if ((x + 1) % 10 === 0) {
-                                    pdf.line(px + cellSize, py, px + cellSize, py + cellSize);
-                                }
-                                if ((y + 1) % 10 === 0) {
-                                    pdf.line(px, py + cellSize, px + cellSize, py + cellSize);
-                                }
+                            if ((y + 1) % 10 === 0) {
+                                pdf.line(px, py + cellSize, px + cellSize, py + cellSize);
                             }
                         }
                     }

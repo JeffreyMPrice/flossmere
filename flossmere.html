@@ -1089,10 +1089,15 @@
                             pdf.rect(px, py, cellSize, cellSize, 'F');
                         }
 
-                        if ((displayMode === 'symbols' || displayMode === 'both') && cellSize >= 1.5) {
+                        if (displayMode === 'symbols' || displayMode === 'both') {
+                            // Always draw symbols, adjust size based on cell size
+                            const symbolSize = Math.max(cellSize * 1.8, 4); // Minimum 4pt font
                             pdf.setTextColor(displayMode === 'both' ? 255 : 0);
-                            pdf.setFontSize(Math.min(cellSize * 2, 8));
-                            pdf.text(color.symbol, px + cellSize / 2, py + cellSize * 0.7, {align: 'center'});
+                            pdf.setFontSize(symbolSize);
+
+                            // Adjust vertical position based on cell size
+                            const verticalOffset = cellSize < 2 ? 0.8 : 0.7;
+                            pdf.text(color.symbol, px + cellSize / 2, py + cellSize * verticalOffset, {align: 'center'});
                         }
                     }
 
